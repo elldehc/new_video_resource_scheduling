@@ -237,16 +237,11 @@ def latency(bw, maxbw, edge_it, cloud_it, trans_it, loc):
         # 其中0.01831是cloud DNN输出结果boxes,scores,classes所占用的数据大小 400, 100, 100
     return latency
 
-import numpy as np
+
 '''
 需要对不同function的不同参数进行设定，目前主要设定3中类型，accuracy-perfer, latency-prefer, balance-prefer
 prefer = 0, accuracy-perfer
 prefer = 1, latency-perfer
 prefer = 2, balance-perfer
 '''
-if __name__ == '__main__':
-    flag = 0
-    prefer = 0
-    accuracy = 0
-    latency = 0
-    # U = utility(accuracy, latency, flag, prefer)
+

@@ -689,18 +689,131 @@ def UpgradeSolution(current_solution, single_resource, angular_coefficient,
     # 40.50000000000001, 42.29500000000001, 36.15000000000001],
     # 'cloud_usage': 0.0, 'bw_usage': [0.0, 0.0, 0.0, 0.0, 0.0], 'utility': 69.24059999999999}
 
+def config_save_yaml(yaml_name, res):
+    import yaml
+    yamltxt = yaml.dump(res)
+    fp =  open(yaml_name, 'w')
+    fp.write(yamltxt)
+    fp.close()
 
 
+def section(init_camera_json, R, MAX_BW, app_num, alpha, j):
+    print(R)
+    camera_info = read_json(init_camera_json)
+    camera_maping = CreateCameraApp.CameraEdgeMaping(camera_info, region_num, len(camera_info))
+    # print(camera_maping)
+    start_time = time.time()
+    # print(cloud_config)
+    init_items = InitItems(pre_solution, edge_config_dict, cloud_config_dict, camera_info,
+                            edge_config, cloud_config, MAX_BW, TRANS_TIME,
+                            MAX_INTER_MIGRATE, camera_maping, app_num, alpha)
+    # print(init_items['0001'])
+    # assert False
+    # print(init_items['0000']['1010'])
+
+
+    filtered_items = FilterInitItems(init_items)
+    # print(len(filtered_items['0000']))
+    # print(filtered_items['0000'])
+    end_time = time.time()
+    # print('filtered items:', len(init_items['0000']))
+    # print('InitItems:', end_time - start_time)
+    start_t = time.time()
+    current_solution = find_lowest_solution(filtered_items, region_num)
+    # print(current_solution['resource'])
+    # print(current_solution['utility'])
+    ## print(current_solution)
+    res = {}
+    cnt = 0
+    single_resource = {}
+    angular_coefficient = {}
+    max_resource_angular_coefficient = None
+    while (1):
+        # print(cnt)
+        res = current_solution
+        pv = PaneltyVecter(current_solution, R)
+        start_time = time.time()
+        current_solution, max_c, single_resource, angular_coefficient, flag, resource_usage = \
+            MultidimensionResourceReduction(current_solution, pv, filtered_items,
+                                            max_resource_angular_coefficient, camera_maping,
+                                            single_resource, angular_coefficient, region_num)
+        if flag:
+            break
+        end_time = time.time()
+        # print('MultidimensionResourceReduction:', end_time - start_time)
+        # print(max_resource_angular_coefficient)
+        current_solution, single_resource, angular_coefficient, filtered_items = UpgradeSolution(current_solution,
+                                                                                                    single_resource,
+                                                                                                    angular_coefficient,
+                                                                                                    max_c,
+                                                                                                    filtered_items,
+                                                                                                    resource_usage)
+
+        # end_time = time.time()
+        # print('UpgradeUtility:', end_time - start_time)
+        # break
+        cnt = cnt + 1
+        # if cnt == 405:
+        #     break
+        # break
+    end_t = time.time()
+    # print(cnt)
+    # print(res)
+    print('utility: ', res['utility'])
+    print('resource: ', res['resource'])
+    print(res)
+    tmp = []
+    for i in range(len(res['resource'])):
+        tmp.append(res['resource'][i] / R[i])
+    print('min resource utilization: ', min(tmp))
+    print('time:', end_t - start_t)
+    application_u = []
+    application_acc = []
+    application_lat = []
+    application_place = []
+    count = 0
+    cloud_c = 0
+    p_c = 0
+    # print(res['0000']['config'])
+    for cid in res:
+        if len(cid) is 4:
+            for u in res[cid]['appu']:
+                application_u.append(u)
+            for acc in res[cid]['appac']:
+                application_acc.append(acc)
+            for lat in res[cid]['applat']:
+                application_lat.append(lat)
+            for p in res[cid]['place']:
+                application_place.append(p)
+            if res[cid]['config'] is None:
+                continue
+            if len(res[cid]['config']) > 4:
+                count = count + 1
+            if len(res[cid]['config']) >= 3:
+                cloud_c = cloud_c+1
+                if int(res[cid]['config'][-1]) > 0:
+                    p_c = p_c+1
+    # print(application_u)
+    print(count)
+    num_app = len(application_place)
+    # print(num_app)
+    u = (max(application_u), min(application_u), np.mean(application_u), application_place.count(0) / num_app,
+        application_place.count(1) / num_app)
+    a = (max(application_acc), min(application_acc), np.mean(application_acc),
+            application_place.count(0) / num_app, application_place.count(1) / num_app)
+    l = (max(application_lat), min(application_lat), np.mean(application_lat),
+            application_place.count(0) / num_app, application_place.count(1) / num_app)
+
+    yaml_name = 'sol_lw_{}.yaml'.format(j+1)
+
+    config_save_yaml(yaml_name, res)
+
+    return u, a, l, count, (cloud_c, p_c)
 
 
 if __name__ == '__main__':
     edge_excel_file = 'edge_profile_result.xlsx'
     cloud_excel_file = 'cloud_profile_result.xlsx'
-
-
-
-
-
     cudasift_time = 0.0021
     MAX_INTER_MIGRATE = 1  # 表示最大迁移间隔 1代表隔一次才能进行迁移
     # MAX_CLOUD_GPU, MAX_EDGE_GPU, MAX_BW, TRANS_TIME, MAX_INTER_MIGRATE
@@ -727,139 +840,7 @@ if __name__ == '__main__':
     # edge_config, cloud_config = ParetoOptimal.ConfigurationVideo(edge_config_dict, cloud_config_dict)
     # print(len(edge_config_dict['car']), len(cloud_config_dict['car']))
 
-    def config_save_yaml(yaml_name, res):
-        conf = []
-        import yaml
-        yamltxt = yaml.dump(res)
-        fp =  open(yaml_name, 'w')
-        fp.write(yamltxt)
-        fp.close()
-        '''
-        for cid in res.keys():
-            print(cid)
-            if cid is 'resource' and cid is '0':
-                continue
-            else:
-                
-        '''
-
-    def section(init_camera_json, R, MAX_BW, app_num, alpha, j):
-        print(R)
-        camera_info = read_json(init_camera_json)
-        camera_maping = CreateCameraApp.CameraEdgeMaping(camera_info, region_num, len(camera_info))
-        # print(camera_maping)
-        start_time = time.time()
-        # print(cloud_config)
-        init_items = InitItems(pre_solution, edge_config_dict, cloud_config_dict, camera_info,
-                               edge_config, cloud_config, MAX_BW, TRANS_TIME,
-                               MAX_INTER_MIGRATE, camera_maping, app_num, alpha)
-        # print(init_items['0001'])
-        # assert False
-        # print(init_items['0000']['1010'])
-
-
-        filtered_items = FilterInitItems(init_items)
-        # print(len(filtered_items['0000']))
-        # print(filtered_items['0000'])
-        end_time = time.time()
-        # print('filtered items:', len(init_items['0000']))
-        # print('InitItems:', end_time - start_time)
-        start_t = time.time()
-        current_solution = find_lowest_solution(filtered_items, region_num)
-        # print(current_solution['resource'])
-        # print(current_solution['utility'])
-        ## print(current_solution)
-        res = {}
-        cnt = 0
-        single_resource = {}
-        angular_coefficient = {}
-        max_resource_angular_coefficient = None
-        while (1):
-            # print(cnt)
-            res = current_solution
-            pv = PaneltyVecter(current_solution, R)
-            start_time = time.time()
-            current_solution, max_c, single_resource, angular_coefficient, flag, resource_usage = \
-                MultidimensionResourceReduction(current_solution, pv, filtered_items,
-                                                max_resource_angular_coefficient, camera_maping,
-                                                single_resource, angular_coefficient, region_num)
-            if flag:
-                break
-            end_time = time.time()
-            # print('MultidimensionResourceReduction:', end_time - start_time)
-            # print(max_resource_angular_coefficient)
-            current_solution, single_resource, angular_coefficient, filtered_items = UpgradeSolution(current_solution,
-                                                                                                     single_resource,
-                                                                                                     angular_coefficient,
-                                                                                                     max_c,
-                                                                                                     filtered_items,
-                                                                                                     resource_usage)
-
-            # end_time = time.time()
-            # print('UpgradeUtility:', end_time - start_time)
-            # break
-            cnt = cnt + 1
-            # if cnt == 405:
-            #     break
-            # break
-        end_t = time.time()
-        # print(cnt)
-        # print(res)
-        print('utility: ', res['utility'])
-        print('resource: ', res['resource'])
-        print(res)
-        tmp = []
-        for i in range(len(res['resource'])):
-            tmp.append(res['resource'][i] / R[i])
-        print('min resource utilization: ', min(tmp))
-        print('time:', end_t - start_t)
-        application_u = []
-        application_acc = []
-        application_lat = []
-        application_place = []
-        count = 0
-        cloud_c = 0
-        p_c = 0
-        # print(res['0000']['config'])
-        for cid in res:
-            if len(cid) is 4:
-                for u in res[cid]['appu']:
-                    application_u.append(u)
-                for acc in res[cid]['appac']:
-                    application_acc.append(acc)
-                for lat in res[cid]['applat']:
-                    application_lat.append(lat)
-                for p in res[cid]['place']:
-                    application_place.append(p)
-                if res[cid]['config'] is None:
-                    continue
-                if len(res[cid]['config']) > 4:
-                    count = count + 1
-                if len(res[cid]['config']) >= 3:
-                    cloud_c = cloud_c+1
-                    if int(res[cid]['config'][-1]) > 0:
-                        p_c = p_c+1
-        # print(application_u)
-        print(count)
-        num_app = len(application_place)
-        # print(num_app)
-        u = (max(application_u), min(application_u), np.mean(application_u), application_place.count(0) / num_app,
-            application_place.count(1) / num_app)
-        a = (max(application_acc), min(application_acc), np.mean(application_acc),
-               application_place.count(0) / num_app, application_place.count(1) / num_app)
-        l = (max(application_lat), min(application_lat), np.mean(application_lat),
-               application_place.count(0) / num_app, application_place.count(1) / num_app)
-
-        yaml_name = 'sol_lw_{}.yaml'.format(j+1)
-
-        config_save_yaml(yaml_name, res)
-
-        return u, a, l, count, (cloud_c, p_c)
-
-        # count是放置在云端的
-        # print(res)
-
-        # print(filtered_items['camera0037']['720 3 1'])
+    
 
     
     # u, a, l = section(init_camera_json, R, 100, app_num)
@@ -882,7 +863,7 @@ if __name__ == '__main__':
     # json_name = ['camera_app-{m,50,1}.json', 'camera_app-{m,50,2}.json', 'camera_app-{m,50,3}.json', 'camera_app-{m,50,4}.json', 'camera_app-{m,50,5}.json']
     for j in range(len(alpha_l)):
         R = [100, 100, 200, 50, 50]
-        u, a, l, count, pp = section(init_camera_json, R, 50, 24, alpha_l[j], j)
+        u, a, l, count, pp = section(init_camera_json, R, 500, 32, alpha_l[j], j)
         accuracy.append(a[2])
         latency.append(l[2])
         utility.append(u[2])
