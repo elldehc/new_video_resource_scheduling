@@ -83,6 +83,7 @@ def InitItem_start(edge_config_dict, cloud_config_dict, camera_app, edge_config,
                 per_app_acc = []
                 per_app_lat = []
                 per_app_place = []
+                per_app_name=[]
                 for aid in camera_app[cid]:  # 当前camera下的每个app
                     # print(camera_app[cid][aid])
                     # print(aid)
@@ -135,6 +136,7 @@ def InitItem_start(edge_config_dict, cloud_config_dict, camera_app, edge_config,
                         per_app_acc.append(edge_accuracy)
                         per_app_lat.append(edge_latency)
                         per_app_place.append(0)
+                        per_app_name.append(aid)
                     else:
                         placement_flag_cloud = 1
                         U = cloud_U
@@ -142,6 +144,7 @@ def InitItem_start(edge_config_dict, cloud_config_dict, camera_app, edge_config,
                         per_app_acc.append(cloud_accuracy)
                         per_app_lat.append(cloud_latency)
                         per_app_place.append(1)
+                        per_app_name.append(aid)
                     sumU = sumU + U
                 # print(app_placement)
                 # print(sumU)
@@ -174,7 +177,7 @@ def InitItem_start(edge_config_dict, cloud_config_dict, camera_app, edge_config,
 
                 per_camera_items.update({str(placement_flag_edge)+ec+str(placement_flag_cloud)+cc:
                                              [profile, [placement_flag_edge, placement_flag_cloud], per_app_utility,
-                                              per_app_acc, per_app_lat, per_app_place]})
+                                              per_app_acc, per_app_lat, per_app_place,per_app_name]})
         camera_items.update({cid: per_camera_items})
         # UtilityFunction.utility()
     # file = open('tmp_camera_app.json', 'w')
@@ -232,6 +235,7 @@ def find_lowest_solution(init_items, region_num):
         current_camera_solution.update({'appac': items_info[3]})
         current_camera_solution.update({'applat': items_info[4]})
         current_camera_solution.update({'place': items_info[5]})
+        current_camera_solution.update({'name': items_info[6]})
         # current_camera_solution.update({'loc': loc})
         for i in range(region_num*2+2):
             total[i] = total[i] + items_info[0][i]
@@ -464,6 +468,7 @@ def UpgradeSolution(current_solution, single_resource, angular_coefficient,
     camera_replace_dict.update({'appac': filtered_items[camera_replace][config_replace][3]})
     camera_replace_dict.update({'applat': filtered_items[camera_replace][config_replace][4]})
     camera_replace_dict.update({'place': filtered_items[camera_replace][config_replace][5]})
+    camera_replace_dict.update({'name': filtered_items[camera_replace][config_replace][6]})
     # camera_replace_dict.update({'loc': filtered_items[camera_replace][config_replace][5]})
     # print(filtered_items[camera_replace][config_replace][6])
     # print(camera_replace_dict)
@@ -558,11 +563,18 @@ def section(init_camera_json, R, MAX_BW, app_num, alpha, j):
     print('utility: ', res['utility'])
     print('resource: ', res['resource'])
     print(res)
-    
+    res_mapped=dict()
+    camera_info_mapped=dict()
+    for edge,cams in camera_maping.items():
+        res_mapped[edge]=dict()
+        camera_info_mapped[edge]=dict()
+        for cam in cams:
+            res_mapped[edge][cam]=res[cam]
+            camera_info_mapped[edge][cam]=camera_info[cam]
     # print(application_u)
     
     
-    return res
+    return res,camera_info,res_mapped,camera_info_mapped
 
 
 if __name__ == '__main__':
@@ -597,13 +609,17 @@ if __name__ == '__main__':
     # R = [200, 200, 200, 200, 200, 800, 100, 100, 100, 100, 100]
     # json_name = ['camera_app-{m,50,1}.json', 'camera_app-{m,50,2}.json', 'camera_app-{m,50,3}.json', 'camera_app-{m,50,4}.json', 'camera_app-{m,50,5}.json']
     R = [100, 100, 200, 50, 50]
-    res = section(init_camera_json, R, 50, 32, alpha_l[1], 0)
+    res,camera_info,res_mapped,camera_info_mapped = section(init_camera_json, R, 50, 32, alpha_l[1], 0)
     yaml_name = 'sol_lw_1.yaml'
     config_save_yaml(yaml_name, res)
+
     edge_list=[{"addr":"127.0.0.1","port":5000},{"addr":"127.0.0.1","port":5001}]
     cloud_list=[{"addr":"127.0.0.1","port":6000}]
-    # for server in edge_list+cloud_list:
-    #     requests.post("http://{}:{}/config".format(server["addr"],server["port"]),json=res)
+    for i,server in enumerate(edge_list):
+        requests.post("http://{}:{}/config".format(server["addr"],server["port"]),json={"config":res_mapped[i],"task":camera_info_mapped[i]})
+
+    for server in cloud_list:
+        requests.post("http://{}:{}/config".format(server["addr"],server["port"]),json={"config":res,"task":camera_info})
 
 
 
