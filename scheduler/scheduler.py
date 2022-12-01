@@ -7,6 +7,8 @@ import numpy as np
 from utils import *
 import pickle
 import requests
+from flask import Flask,request
+
 
 '''
 solution输出格式：
@@ -33,7 +35,7 @@ appid: [config, location, migration_flag],..., {appid: [config, location, migrat
 'resource': resource, 'utility': utility, 'loc': loc, 'config': config}
 '''
 
-
+app=Flask(__name__)
 
 def InitItem_start(edge_config_dict, cloud_config_dict, camera_app, edge_config, cloud_config,
                    MAX_BW, TRANS_TIME, MAX_INTER_MIGRATE, camera_maping, app_num, alpha):
@@ -503,9 +505,9 @@ def config_save_yaml(yaml_name, res):
     fp.close()
 
 
-def section(init_camera_json, R, MAX_BW, app_num, alpha, j):
+def section(camera_info, R, MAX_BW, app_num, alpha, j):
     print(R)
-    camera_info = read_json(init_camera_json)
+    # camera_info = read_json(init_camera_json)
     camera_maping = CreateCameraApp.CameraEdgeMaping(camera_info, region_num, len(camera_info))
     # print(camera_maping)
     start_time = time.time()
@@ -576,50 +578,49 @@ def section(init_camera_json, R, MAX_BW, app_num, alpha, j):
     
     return res,camera_info,res_mapped,camera_info_mapped
 
+edge_excel_file = 'edge_profile_result.xlsx'
+cloud_excel_file = 'cloud_profile_result.xlsx'
+cudasift_time = 0.0021
+MAX_INTER_MIGRATE = 1  # 表示最大迁移间隔 1代表隔一次才能进行迁移
+edge_config_dict_all, d = excel_to_dict_edge(edge_excel_file)  # 测量数据中未经过过滤的全部的configuration
+cloud_config_dict_all, c = excel_to_dict_cloud(cloud_excel_file)  # 测量数据中未经过过滤的全部的configuration
+# print(cloud_config_dict)
+pre_solution = {}
+edge_config_dict, cloud_config_dict, edge_config, cloud_config = \
+    ParetoOptimal.ParetoFilter(edge_config_dict_all, cloud_config_dict_all)
+# u, a, l = section(init_camera_json, R, 100, app_num)
+# print(u ,a, l)
+# init_camera_json = 'camera_app-{m,50,4}.json'
+init_camera_json = 'camera_app-{m,8,4}.json'
 
-if __name__ == '__main__':
-    edge_excel_file = 'edge_profile_result.xlsx'
-    cloud_excel_file = 'cloud_profile_result.xlsx'
-    cudasift_time = 0.0021
-    MAX_INTER_MIGRATE = 1  # 表示最大迁移间隔 1代表隔一次才能进行迁移
-    edge_config_dict_all, d = excel_to_dict_edge(edge_excel_file)  # 测量数据中未经过过滤的全部的configuration
-    cloud_config_dict_all, c = excel_to_dict_cloud(cloud_excel_file)  # 测量数据中未经过过滤的全部的configuration
-    # print(cloud_config_dict)
-    pre_solution = {}
-    edge_config_dict, cloud_config_dict, edge_config, cloud_config = \
-        ParetoOptimal.ParetoFilter(edge_config_dict_all, cloud_config_dict_all)
+TRANS_TIME = 0.12
+# region_num = 5
+alpha_l=pickle.load(open("alpha_l.pkl","rb"))
+region_num = 2  # edge分为5个片区，每个片区2个edge gpu 10个camera
+# R = [200, 200, 200, 200, 200, 800, 100, 100, 100, 100, 100]
+# json_name = ['camera_app-{m,50,1}.json', 'camera_app-{m,50,2}.json', 'camera_app-{m,50,3}.json', 'camera_app-{m,50,4}.json', 'camera_app-{m,50,5}.json']
+R = [100, 100, 200, 50, 50]
+camera_info=read_json(init_camera_json)
+res,camera_info,res_mapped,camera_info_mapped = section(camera_info, R, 50, 32, alpha_l[1], 0)
+# yaml_name = 'sol_lw.yaml'
+# config_save_yaml(yaml_name, res)
+edge_list=[{"addr":"127.0.0.1","port":5000},{"addr":"127.0.0.1","port":5001}]
+cloud_list=[{"addr":"127.0.0.1","port":6000}]
+for i,server in enumerate(edge_list):
+    requests.post("http://{}:{}/config".format(server["addr"],server["port"]),json={"config":res_mapped[i],"task":camera_info_mapped[i]})
 
-    # print(len(edge_config), len(cloud_config))
-    # edge_config, cloud_config = ParetoOptimal.ConfigurationVideo(edge_config_dict, cloud_config_dict)
-    # print(len(edge_config_dict['car']), len(cloud_config_dict['car']))
+for server in cloud_list:
+    requests.post("http://{}:{}/config".format(server["addr"],server["port"]),json={"config":res,"task":camera_info})
+
 
     
-
-    
-    # u, a, l = section(init_camera_json, R, 100, app_num)
-    # print(u ,a, l)
-    # init_camera_json = 'camera_app-{m,50,4}.json'
-    init_camera_json = 'camera_app-{m,8,4}.json'
-    
-    TRANS_TIME = 0.12
-    # region_num = 5
-    alpha_l=pickle.load(open("alpha_l.pkl","rb"))
-    region_num = 2  # edge分为5个片区，每个片区2个edge gpu 10个camera
-
-    # R = [200, 200, 200, 200, 200, 800, 100, 100, 100, 100, 100]
-    # json_name = ['camera_app-{m,50,1}.json', 'camera_app-{m,50,2}.json', 'camera_app-{m,50,3}.json', 'camera_app-{m,50,4}.json', 'camera_app-{m,50,5}.json']
-    R = [100, 100, 200, 50, 50]
-    res,camera_info,res_mapped,camera_info_mapped = section(init_camera_json, R, 50, 32, alpha_l[1], 0)
-    yaml_name = 'sol_lw_1.yaml'
-    config_save_yaml(yaml_name, res)
-
-    edge_list=[{"addr":"127.0.0.1","port":5000},{"addr":"127.0.0.1","port":5001}]
-    cloud_list=[{"addr":"127.0.0.1","port":6000}]
+@app.route("/task_register",methods=["POST"])
+def task_register():
+    js=request.get_json()
     for i,server in enumerate(edge_list):
-        requests.post("http://{}:{}/config".format(server["addr"],server["port"]),json={"config":res_mapped[i],"task":camera_info_mapped[i]})
-
-    for server in cloud_list:
-        requests.post("http://{}:{}/config".format(server["addr"],server["port"]),json={"config":res,"task":camera_info})
-
+        if js["camera"] in camera_info_mapped[i]:
+            edge=server
+            break
+    return {"config":res[js["camera"]],"edge":edge,"cloud":cloud_list[0]}
 
 

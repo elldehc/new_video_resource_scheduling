@@ -19,7 +19,7 @@ def pipeline(cameranum,tasknum):
     # dummy
     step=int(model[5:])
     for i in range(step,5):
-        frame=np.random.random(frame.shape)*frame
+        frame=np.ones(frame.shape)*frame
     ans=np.mean(frame)
     return pickle.dumps(ans)
 
