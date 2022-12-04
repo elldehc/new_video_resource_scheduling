@@ -167,7 +167,7 @@ def InitItem_start(edge_config_dict, cloud_config_dict, camera_app, edge_config,
                     # cloud_computing_usage = cloud_config_dict[object][cc]['cloud_cu']
                     # bandwidth_usage = cloud_config_dict[object][cc]['bw']
 
-                profile = [0 for i in range(region*2+2)]
+                profile = [0 for i in range(region*2+2)] # edge_computing_usage*region, cloud_computing_usage, bandwith_usage*region, utility
                 # print(profile)
                 # usage_edge_cu = [0 for i in range(region)]
                 profile[cid_map_region] = edge_computing_usage
@@ -599,7 +599,7 @@ alpha_l=pickle.load(open("alpha_l.pkl","rb"))
 region_num = 2  # edge分为5个片区，每个片区2个edge gpu 10个camera
 # R = [200, 200, 200, 200, 200, 800, 100, 100, 100, 100, 100]
 # json_name = ['camera_app-{m,50,1}.json', 'camera_app-{m,50,2}.json', 'camera_app-{m,50,3}.json', 'camera_app-{m,50,4}.json', 'camera_app-{m,50,5}.json']
-R = [100, 100, 200, 50, 50]
+R = [100, 100, 200, 50, 50] # edge0_computing_capacity, edge1_computing_capacity, cloud_computing_capacity, edge0_bandwith_capacity, edge1_bandwith_capacity
 camera_info=read_json(init_camera_json)
 res,camera_info,res_mapped,camera_info_mapped = section(camera_info, R, 50, 32, alpha_l[1], 0)
 # yaml_name = 'sol_lw.yaml'
