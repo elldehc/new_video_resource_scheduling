@@ -4,6 +4,9 @@ import numpy as np
 import time
 from flask import Flask,request
 import pickle
+import ffmpeg
+from pathlib import Path
+import cv2
 
 
 app=Flask(__name__)
@@ -14,14 +17,27 @@ cloud_addr={"addr":"127.0.0.1","port":6000}
 
 @app.route("/task/<cameranum>/<tasknum>",methods=["POST"])
 def pipeline(cameranum,tasknum):
-    frame=pickle.loads(request.data)
+    print(len(request.data),request.data[:50])
+    open(f"{cameranum}_{tasknum}.mp4","wb").write(request.data)
+    frame,err=ffmpeg.input(f"{cameranum}_{tasknum}.mp4",format="mp4").output("pipe:",format="rawvideo",pix_fmt="rgb24").overwrite_output().run(input=request.data,capture_stdout=True)
+    probe = ffmpeg.probe(f"{cameranum}_{tasknum}.mp4")
+    video_stream = next((stream for stream in probe['streams'] if stream['codec_type'] == 'video'), None)
+    width = int(video_stream['width'])
+    height = int(video_stream['height'])
+    frame=np.frombuffer(frame,np.uint8).reshape([-1,height, width, 3])
     print(frame.shape)
     model,step=models[(cameranum,tasknum)]
     # dummy
     for i in range(step):
         frame=np.ones(frame.shape)*frame
     if step<5:
-        data=pickle.dumps(frame)
+        frame_flattened=np.reshape(frame,[frame.shape[0]*frame.shape[1],frame.shape[2]*frame.shape[3]])
+        mx=np.max(np.abs(frame_flattened))
+        f=np.math.ceil(np.math.log2(mx/128))
+        frame_flattened=(frame_flattened/(1<<f)).astype(np.int8)
+        cv2.imwrite(f"{cameranum}_{tasknum}.png",frame_flattened)
+        data=open(f"{cameranum}_{tasknum}.png","rb").read()
+        data=pickle.dumps({"shape":frame.shape,"factor":f,"data":data})
         r=requests.post("http://{}:{}/task/{}/{}".format(cloud_addr["addr"],cloud_addr["port"],cameranum,tasknum),data=data)
         return r.content
     else:

@@ -28,31 +28,31 @@ def pipeline(edge_addr,edge_resolution,edge_fps,cloud_addr,cloud_resolution,clou
         im=cv2.imread(str(it))
         images.append(im)
     images=np.stack(images)
-    ffmpeg.input("pipe:",format="rawvideo",pix_fmt="bgr24",video_size=(images.shape[2],images.shape[1]),framerate=edge_fps).filter("scale",size=f"{edge_resolution//3*4}:{edge_resolution}").output(image_files[0].stem+"_edge.mp4",vcodec="h264",format="mp4").overwrite_output().run(input=np.ravel(images[::30//edge_fps]).tobytes(),quiet=True)
+    ffmpeg.input("pipe:",format="rawvideo",pix_fmt="bgr24",video_size=(images.shape[2],images.shape[1]),framerate=edge_fps).filter("scale",size=f"{edge_resolution//3*4}:{edge_resolution}").output(image_files[0].stem+"_edge.mp4",vcodec="h264",pix_fmt="rgb24",format="mp4").overwrite_output().run(input=np.ravel(images[::30//edge_fps]).tobytes(),quiet=True)
     frames_edge=open(image_files[0].stem+"_edge.mp4","rb").read()
-    ffmpeg.input("pipe:",format="rawvideo",pix_fmt="bgr24",video_size=(images.shape[2],images.shape[1]),framerate=cloud_fps).filter("scale",size=f"{cloud_resolution//3*4}:{cloud_resolution}").output(image_files[0].stem+"_cloud.mp4",vcodec="h264",format="mp4").overwrite_output().run(input=np.ravel(images[::30//cloud_fps]).tobytes(),quiet=True)
+    ffmpeg.input("pipe:",format="rawvideo",pix_fmt="bgr24",video_size=(images.shape[2],images.shape[1]),framerate=cloud_fps).filter("scale",size=f"{cloud_resolution//3*4}:{cloud_resolution}").output(image_files[0].stem+"_cloud.mp4",vcodec="h264",pix_fmt="rgb24",format="mp4").overwrite_output().run(input=np.ravel(images[::30//cloud_fps]).tobytes(),quiet=True)
     frames_cloud=open(image_files[0].stem+"_cloud.mp4","rb").read()
     # with open(f"edge_{time.time_ns()}.mp4","wb") as f:
     #     f.write(frames_edge)
     # with open(f"cloud_{time.time_ns()}.mp4","wb") as f:
     #     f.write(frames_cloud)
-    
+    print(len(frames_edge),len(frames_cloud))
     # frames_edge=np.random.randint(0,256,(edge_fps,3,edge_resolution,edge_resolution//3*4),np.uint8)
     # frames_cloud=np.random.randint(0,256,(cloud_fps,3,cloud_resolution,cloud_resolution//3*4),np.uint8)
     for task,pos in task_place.items():
         print(task,pos)
         if pos==0:
             data=frames_edge
-            # r=requests.post("http://{}:{}/task/{}/{}".format(edge_addr["addr"],edge_addr["port"],camera_num,task),data=data)
-            # ans=pickle.loads(r.content)
+            r=requests.post("http://{}:{}/task/{}/{}".format(edge_addr["addr"],edge_addr["port"],camera_num,task),data=data)
+            ans=pickle.loads(r.content)
         elif pos==1 and step!=0:
             data=frames_cloud
-            # r=requests.post("http://{}:{}/task/{}/{}".format(edge_addr["addr"],edge_addr["port"],camera_num,task),data=data)
-            # ans=pickle.loads(r.content)
+            r=requests.post("http://{}:{}/task/{}/{}".format(edge_addr["addr"],edge_addr["port"],camera_num,task),data=data)
+            ans=pickle.loads(r.content)
         else:
             data=frames_cloud
-            # r=requests.post("http://{}:{}/task/{}/{}".format(cloud_addr["addr"],cloud_addr["port"],camera_num,task),data=data)
-            # ans=pickle.loads(r.content)
+            r=requests.post("http://{}:{}/task/{}/{}".format(cloud_addr["addr"],cloud_addr["port"],camera_num,task),data=data)
+            ans=pickle.loads(r.content)
     print("time=",time.time()-tttt)
 
 
