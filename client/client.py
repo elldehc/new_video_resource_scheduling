@@ -7,6 +7,9 @@ import pickle
 import argparse
 import CreateCameraApp
 import json
+import ffmpeg
+from pathlib import Path
+import cv2
 
 
 def read_json(filename):
@@ -18,24 +21,38 @@ def read_json(filename):
     return camera_info
 
 
-def pipeline(edge_addr,edge_resolution,edge_fps,cloud_addr,cloud_resolution,cloud_fps,step,task_place,camera_num):
+def pipeline(edge_addr,edge_resolution,edge_fps,cloud_addr,cloud_resolution,cloud_fps,step,task_place,camera_num,image_files):
     tttt=time.time()
-    frames_edge=np.random.randint(0,256,(edge_fps,3,edge_resolution,edge_resolution//3*4),np.uint8)
-    frames_cloud=np.random.randint(0,256,(cloud_fps,3,cloud_resolution,cloud_resolution//3*4),np.uint8)
+    images=[]
+    for it in image_files:
+        im=cv2.imread(str(it))
+        images.append(im)
+    images=np.stack(images)
+    ffmpeg.input("pipe:",format="rawvideo",pix_fmt="bgr24",video_size=(images.shape[2],images.shape[1]),framerate=edge_fps).filter("scale",size=f"{edge_resolution//3*4}:{edge_resolution}").output(image_files[0].stem+"_edge.mp4",vcodec="h264",format="mp4").overwrite_output().run(input=np.ravel(images[::30//edge_fps]).tobytes(),quiet=True)
+    frames_edge=open(image_files[0].stem+"_edge.mp4","rb").read()
+    ffmpeg.input("pipe:",format="rawvideo",pix_fmt="bgr24",video_size=(images.shape[2],images.shape[1]),framerate=cloud_fps).filter("scale",size=f"{cloud_resolution//3*4}:{cloud_resolution}").output(image_files[0].stem+"_cloud.mp4",vcodec="h264",format="mp4").overwrite_output().run(input=np.ravel(images[::30//cloud_fps]).tobytes(),quiet=True)
+    frames_cloud=open(image_files[0].stem+"_cloud.mp4","rb").read()
+    # with open(f"edge_{time.time_ns()}.mp4","wb") as f:
+    #     f.write(frames_edge)
+    # with open(f"cloud_{time.time_ns()}.mp4","wb") as f:
+    #     f.write(frames_cloud)
+    
+    # frames_edge=np.random.randint(0,256,(edge_fps,3,edge_resolution,edge_resolution//3*4),np.uint8)
+    # frames_cloud=np.random.randint(0,256,(cloud_fps,3,cloud_resolution,cloud_resolution//3*4),np.uint8)
     for task,pos in task_place.items():
         print(task,pos)
         if pos==0:
-            data=pickle.dumps(frames_edge)
-            r=requests.post("http://{}:{}/task/{}/{}".format(edge_addr["addr"],edge_addr["port"],camera_num,task),data=data)
-            ans=pickle.loads(r.content)
+            data=frames_edge
+            # r=requests.post("http://{}:{}/task/{}/{}".format(edge_addr["addr"],edge_addr["port"],camera_num,task),data=data)
+            # ans=pickle.loads(r.content)
         elif pos==1 and step!=0:
-            data=pickle.dumps(frames_cloud)
-            r=requests.post("http://{}:{}/task/{}/{}".format(edge_addr["addr"],edge_addr["port"],camera_num,task),data=data)
-            ans=pickle.loads(r.content)
+            data=frames_cloud
+            # r=requests.post("http://{}:{}/task/{}/{}".format(edge_addr["addr"],edge_addr["port"],camera_num,task),data=data)
+            # ans=pickle.loads(r.content)
         else:
-            data=pickle.dumps(frames_cloud)
-            r=requests.post("http://{}:{}/task/{}/{}".format(cloud_addr["addr"],cloud_addr["port"],camera_num,task),data=data)
-            ans=pickle.loads(r.content)
+            data=frames_cloud
+            # r=requests.post("http://{}:{}/task/{}/{}".format(cloud_addr["addr"],cloud_addr["port"],camera_num,task),data=data)
+            # ans=pickle.loads(r.content)
     print("time=",time.time()-tttt)
 
 
@@ -43,6 +60,7 @@ def pipeline(edge_addr,edge_resolution,edge_fps,cloud_addr,cloud_resolution,clou
 
 RES_MAP = [360, 600, 720, 900, 1080]
 FPS_MAP = [2, 3, 5, 10, 15]
+video_dir=r"D:\uav0000009_03358_v"
 if __name__=="__main__":
     parser=argparse.ArgumentParser()
     parser.add_argument("camera_num")
@@ -80,7 +98,13 @@ if __name__=="__main__":
     for i in range(len(config["name"])):
         task_place[config["name"][i]]=config["place"][i]
     print(edge_resolution,edge_fps,cloud_resolution,cloud_fps)
-    for _ in range(2):
-        multiprocessing.Process(target=pipeline,args=(edge_addr,edge_resolution,edge_fps,cloud_addr,cloud_resolution,cloud_fps,step,task_place,camera_num)).start()
+    image_files=sorted(list(Path(video_dir).glob("*.jpg")))
+    # images=[]
+    # for it in image_files:
+    #     im=cv2.imread(str(it))
+    #     images.append(im)
+    # images=np.stack(images)
+    for i in range(1,len(image_files)-30+1,30):
+        multiprocessing.Process(target=pipeline,args=(edge_addr,edge_resolution,edge_fps,cloud_addr,cloud_resolution,cloud_fps,step,task_place,camera_num,image_files[i:i+30])).start()
         time.sleep(1)
     
