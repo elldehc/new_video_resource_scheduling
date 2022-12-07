@@ -7,6 +7,7 @@ import pickle
 import ffmpeg
 from pathlib import Path
 import cv2
+import ComputationResource
 
 
 app=Flask(__name__)
@@ -70,3 +71,6 @@ def config():
         
     return "ok"
                 
+@app.route("/get_computation_resource", methods=["POST"])
+def get_computation_resource():
+    return str(ComputationResource.query_computation_resource())
