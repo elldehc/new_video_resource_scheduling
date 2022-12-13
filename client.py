@@ -53,14 +53,14 @@ def pipeline(edge_addr,edge_resolution,edge_fps,cloud_addr,cloud_resolution,clou
             data=frames_cloud
             r=requests.post("http://{}:{}/task/{}/{}".format(cloud_addr["addr"],cloud_addr["port"],camera_num,task),data=data)
             ans=pickle.loads(r.content)
-    print("time=",time.time()-tttt)
+    print(ans,"time=",time.time()-tttt)
 
 
 
 
 RES_MAP = [360, 600, 720, 900, 1080]
 FPS_MAP = [2, 3, 5, 10, 15]
-video_dir=r"D:\uav0000009_03358_v"
+video_dir=r"/home/hhw/uav0000009_03358_v"
 if __name__=="__main__":
     parser=argparse.ArgumentParser()
     parser.add_argument("camera_num")
