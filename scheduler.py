@@ -624,3 +624,18 @@ def task_register():
     return {"config":res[js["camera"]],"edge":edge,"cloud":cloud_list[0]}
 
 
+@app.route("/update_computation_resource", methods=["POST"])
+def update_computation_resource():
+    total_resource = 0
+    for i, server in enumerate(edge_list):
+        resp = requests.post("http://{}:{}/get_computation_resource".format(server["addr"], server["port"]))
+        resource = float(resp.content.decode('UTF-8'))
+        R[i] = resource
+        total_resource += resource
+    for i, server in enumerate(cloud_list):
+        resp = requests.post("http://{}:{}/get_computation_resource".format(server["addr"], server["port"]))
+        resource = float(resp.content.decode('UTF-8'))
+        # R[i] = resource
+        total_resource += resource
+    print(total_resource)
+    return "ok"

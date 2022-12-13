@@ -13,6 +13,7 @@ from backbone.resnet50 import ResNet50
 from backbone.resnet101 import ResNet101,resnet101front
 from config.eval_config import EvalConfig as Config
 import torch
+import ComputationResource
 
 
 app=Flask(__name__)
@@ -92,3 +93,6 @@ def config():
             
     return "ok"
                 
+@app.route("/get_computation_resource", methods=["POST"])
+def get_computation_resource():
+    return str(ComputationResource.query_computation_resource())
